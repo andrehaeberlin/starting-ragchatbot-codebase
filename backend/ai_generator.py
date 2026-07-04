@@ -139,10 +139,15 @@ Provide only the direct answer to what was asked.
             ]
         })
 
-        # Execute all tool calls and add results as individual tool messages
+        # Execute all tool calls and add results as individual tool messages.
+        # Malformed arguments or unexpected tool signatures must not crash the
+        # request - they're degraded to an error message the model can react to.
         for tool_call in message.tool_calls:
-            arguments = json.loads(tool_call.function.arguments)
-            tool_result = tool_manager.execute_tool(tool_call.function.name, **arguments)
+            try:
+                arguments = json.loads(tool_call.function.arguments)
+                tool_result = tool_manager.execute_tool(tool_call.function.name, **arguments)
+            except (json.JSONDecodeError, TypeError) as e:
+                tool_result = f"Tool execution error: {e}"
 
             messages.append({
                 "role": "tool",

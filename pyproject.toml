@@ -13,3 +13,15 @@ dependencies = [
     "python-multipart==0.0.20",
     "python-dotenv==1.1.1",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+markers = [
+    "live: hits the real OpenAI API, run manually only (uv run pytest -m live -s)",
+]
+addopts = "-m 'not live'"
