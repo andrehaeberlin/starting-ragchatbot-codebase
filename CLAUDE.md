@@ -16,7 +16,7 @@ uv sync
 cd backend && uv run uvicorn app:app --reload --port 8000
 ```
 
-Requires a `.env` file in the repo root with `ANTHROPIC_API_KEY=...` (see `.env.example`).
+Requires a `.env` file in the repo root with `OPENAI_API_KEY=...` (see `.env.example`).
 
 App runs at `http://localhost:8000` (frontend) and `http://localhost:8000/docs` (Swagger/OpenAPI).
 
@@ -24,15 +24,15 @@ On every startup, `backend/app.py` loads all documents from `../docs` into Chrom
 
 ## Architecture
 
-Full-stack RAG chatbot: vanilla JS/HTML frontend + FastAPI backend, ChromaDB for vector storage, Claude (Anthropic) for generation. Course content lives in `docs/*.txt`.
+Full-stack RAG chatbot: vanilla JS/HTML frontend + FastAPI backend, ChromaDB for vector storage, OpenAI (Chat Completions, default model `gpt-4o-mini`) for generation. Course content lives in `docs/*.txt`.
 
 ### Request flow
 
 `frontend/script.js` → `POST /api/query` (`backend/app.py`) → `RAGSystem.query()` (`backend/rag_system.py`) → `AIGenerator.generate_response()` (`backend/ai_generator.py`).
 
-The AI generator calls Claude **with a `search_course_content` tool attached**, letting Claude itself decide whether to search:
-- General knowledge questions → Claude answers directly, no tool call.
-- Course-specific questions → Claude emits a `tool_use` block, `ToolManager` dispatches to `CourseSearchTool.execute()` (`backend/search_tools.py`), which queries `VectorStore.search()`, and results are sent back to Claude in a **second, tool-free** API call to synthesize the final answer. The system prompt enforces **one search per query maximum**.
+The AI generator calls OpenAI **with a `search_course_content` tool attached** (converted from the internal Anthropic-style tool definition into OpenAI's `{"type": "function", "function": {...}}` shape in `AIGenerator._to_openai_tools`), letting the model itself decide whether to search:
+- General knowledge questions → model answers directly, no tool call.
+- Course-specific questions → model returns `finish_reason == "tool_calls"`, `ToolManager` dispatches to `CourseSearchTool.execute()` (`backend/search_tools.py`), which queries `VectorStore.search()`, and results are sent back as `role: "tool"` messages in a **second, tool-free** API call to synthesize the final answer. The system prompt enforces **one search per query maximum**.
 
 Sources for the last search are tracked on the tool instance (`CourseSearchTool.last_sources`) and pulled/reset by `RAGSystem.query()` after each turn — this is stateful and single-threaded; a new search overwrites the previous one.
 
@@ -67,4 +67,4 @@ Chunking is sentence-aware (regex-based sentence splitting, careful of abbreviat
 
 ### Config
 
-All tunables (`ANTHROPIC_MODEL`, `CHUNK_SIZE`, `CHUNK_OVERLAP`, `MAX_RESULTS`, `MAX_HISTORY`, `CHROMA_PATH`, `EMBEDDING_MODEL`) live in one dataclass: `backend/config.py`.
+All tunables (`OPENAI_MODEL`, `CHUNK_SIZE`, `CHUNK_OVERLAP`, `MAX_RESULTS`, `MAX_HISTORY`, `CHROMA_PATH`, `EMBEDDING_MODEL`) live in one dataclass: `backend/config.py`.
