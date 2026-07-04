@@ -230,6 +230,9 @@ header h1 {
     padding: 0.25rem 0.5rem;
     user-select: none;
     font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
 }
 
 .sources-collapsible summary:hover {
@@ -237,21 +240,88 @@ header h1 {
 }
 
 .sources-collapsible[open] summary {
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.sources-count {
+    background: var(--surface-hover);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 0.05rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
 }
 
 .sources-content {
-    padding: 0 0.5rem 0.25rem 1.5rem;
+    padding: 0 0.5rem 0.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.source-group {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.7rem;
+}
+
+.source-course-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    margin-bottom: 0.35rem;
+}
+
+.source-lesson-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.source-lesson-pill {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    padding: 0.2rem 0.6rem;
     color: var(--text-secondary);
-}
-
-.source-link {
-    color: var(--primary-color);
     text-decoration: none;
+    font-size: 0.7rem;
+    line-height: 1.2;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.source-link:hover {
-    text-decoration: underline;
+a.source-lesson-pill:hover {
+    background: var(--surface-hover);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.source-pill {
+    display: inline-flex;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    padding: 0.3rem 0.7rem;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+a.source-pill:hover {
+    background: var(--surface-hover);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    transform: translateY(-1px);
+}
+
+.source-pill-plain {
+    color: var(--text-secondary);
+    cursor: default;
 }
 
 /* Markdown formatting styles */
@@ -456,7 +526,8 @@ header h1 {
 
 /* Sidebar Headers */
 .stats-header,
-.suggested-header {
+.suggested-header,
+.new-chat-button {
     font-size: 0.875rem;
     font-weight: 600;
     color: var(--text-secondary);
@@ -472,13 +543,22 @@ header h1 {
 }
 
 .stats-header:focus,
-.suggested-header:focus {
+.suggested-header:focus,
+.new-chat-button:focus {
     color: var(--primary-color);
 }
 
 .stats-header:hover,
-.suggested-header:hover {
+.suggested-header:hover,
+.new-chat-button:hover {
     color: var(--primary-color);
+}
+
+.new-chat-button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
 }
 
 .stats-header::-webkit-details-marker,

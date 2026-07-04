@@ -5,7 +5,7 @@ const API_URL = '/api';
 let currentSessionId = null;
 
 // DOM elements
-let chatMessages, chatInput, sendButton, totalCourses, courseTitles;
+let chatMessages, chatInput, sendButton, totalCourses, courseTitles, newChatButton;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -15,7 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     sendButton = document.getElementById('sendButton');
     totalCourses = document.getElementById('totalCourses');
     courseTitles = document.getElementById('courseTitles');
-    
+    newChatButton = document.getElementById('newChatButton');
+
     setupEventListeners();
     createNewSession();
     loadCourseStats();
@@ -28,8 +29,11 @@ function setupEventListeners() {
     chatInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') sendMessage();
     });
-    
-    
+
+    // New chat
+    newChatButton.addEventListener('click', startNewChat);
+
+
     // Suggested questions
     document.querySelectorAll('.suggested-item').forEach(button => {
         button.addEventListener('click', (e) => {
@@ -122,16 +126,33 @@ function addMessage(content, type, sources = null, isWelcome = false) {
     let html = `<div class="message-content">${displayContent}</div>`;
     
     if (sources && sources.length > 0) {
-        const sourcesHtml = sources.map(source => {
-            const text = escapeHtml(source.text);
-            return source.link
-                ? `<a href="${source.link}" target="_blank" rel="noopener noreferrer" class="source-link">${text}</a>`
-                : text;
-        }).join(', ');
+        const sourcesHtml = groupSourcesByCourse(sources).map(group => {
+            if (group.lessons.length === 0) {
+                // No lesson breakdown - render as a single standalone pill
+                const text = escapeHtml(group.course);
+                return group.link
+                    ? `<a href="${group.link}" target="_blank" rel="noopener noreferrer" class="source-pill">${text}</a>`
+                    : `<span class="source-pill source-pill-plain">${text}</span>`;
+            }
+
+            const lessonPills = group.lessons.map(lesson => {
+                const label = escapeHtml(lesson.label);
+                return lesson.link
+                    ? `<a href="${lesson.link}" target="_blank" rel="noopener noreferrer" class="source-lesson-pill">${label}</a>`
+                    : `<span class="source-lesson-pill source-pill-plain">${label}</span>`;
+            }).join('');
+
+            return `
+                <div class="source-group">
+                    <div class="source-course-name">${escapeHtml(group.course)}</div>
+                    <div class="source-lesson-row">${lessonPills}</div>
+                </div>
+            `;
+        }).join('');
 
         html += `
             <details class="sources-collapsible">
-                <summary class="sources-header">Sources</summary>
+                <summary class="sources-header">Sources <span class="sources-count">${sources.length}</span></summary>
                 <div class="sources-content">${sourcesHtml}</div>
             </details>
         `;
@@ -140,8 +161,45 @@ function addMessage(content, type, sources = null, isWelcome = false) {
     messageDiv.innerHTML = html;
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
-    
+
     return messageId;
+}
+
+// Group flat source list ("Course - Lesson N") into per-course entries with
+// deduped, numerically-sorted lesson chips, so a course isn't repeated per lesson.
+function groupSourcesByCourse(sources) {
+    const lessonSuffix = / - Lesson (\d+)$/;
+    const groups = new Map();
+    const order = [];
+
+    sources.forEach(source => {
+        const match = source.text.match(lessonSuffix);
+        const course = match ? source.text.slice(0, match.index) : source.text;
+        const lessonNumber = match ? parseInt(match[1], 10) : null;
+
+        if (!groups.has(course)) {
+            groups.set(course, { course, link: source.link, lessons: [], lessonNumbers: new Set() });
+            order.push(course);
+        }
+        const group = groups.get(course);
+
+        if (lessonNumber === null) {
+            // Prefer a course-level link if we encounter one
+            if (!group.link) group.link = source.link;
+            return;
+        }
+
+        if (!group.lessonNumbers.has(lessonNumber)) {
+            group.lessonNumbers.add(lessonNumber);
+            group.lessons.push({ label: `Lesson ${lessonNumber}`, link: source.link, number: lessonNumber });
+        }
+    });
+
+    return order.map(course => {
+        const group = groups.get(course);
+        group.lessons.sort((a, b) => a.number - b.number);
+        return group;
+    });
 }
 
 // Helper function to escape HTML for user messages
@@ -157,6 +215,21 @@ async function createNewSession() {
     currentSessionId = null;
     chatMessages.innerHTML = '';
     addMessage('Welcome to the Course Materials Assistant! I can help you with questions about courses, lessons and specific content. What would you like to know?', 'assistant', null, true);
+}
+
+// Start a new chat: clear the current session server-side, then reset the UI
+async function startNewChat() {
+    if (currentSessionId) {
+        try {
+            await fetch(`${API_URL}/session/${currentSessionId}`, { method: 'DELETE' });
+        } catch (error) {
+            console.error('Error clearing session:', error);
+        }
+    }
+    chatInput.disabled = false;
+    sendButton.disabled = false;
+    createNewSession();
+    chatInput.focus();
 }
 
 // Load course statistics
