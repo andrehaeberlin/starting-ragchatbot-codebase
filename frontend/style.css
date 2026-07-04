@@ -559,6 +559,9 @@ a.source-pill:hover {
     width: 100%;
     text-align: left;
     font-family: inherit;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
 }
 
 .stats-header::-webkit-details-marker,
