@@ -179,3 +179,109 @@ def mock_openai_client():
 @pytest.fixture
 def stub_tool_manager():
     return Mock(spec=ToolManager)
+
+
+# ---------------------------------------------------------------------------
+# FastAPI test app (backend/app.py can't be imported directly in tests: it
+# instantiates a real RAGSystem at import time, registers a startup event
+# that reads ../docs, and mounts StaticFiles(directory="../frontend") - a
+# path that only resolves when cwd is backend/. This mirrors its route
+# bodies/models against an injected mock RAGSystem and a fixture-controlled
+# static directory instead.)
+# ---------------------------------------------------------------------------
+
+from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.testclient import TestClient
+from pydantic import BaseModel
+
+
+class QueryRequest(BaseModel):
+    query: str
+    session_id: Optional[str] = None
+
+
+class SourceItem(BaseModel):
+    text: str
+    link: Optional[str] = None
+
+
+class QueryResponse(BaseModel):
+    answer: str
+    sources: list[SourceItem]
+    session_id: str
+
+
+class CourseStats(BaseModel):
+    total_courses: int
+    course_titles: list[str]
+
+
+def create_test_app(rag_system, static_dir) -> FastAPI:
+    """Builds a FastAPI app mirroring backend/app.py's API routes against the
+    given rag_system, with static files served from static_dir instead of
+    the real ../frontend."""
+    app = FastAPI(title="Course Materials RAG System - Test")
+
+    @app.post("/api/query", response_model=QueryResponse)
+    async def query_documents(request: QueryRequest):
+        try:
+            session_id = request.session_id
+            if not session_id:
+                session_id = rag_system.session_manager.create_session()
+            answer, sources = rag_system.query(request.query, session_id)
+            return QueryResponse(answer=answer, sources=sources, session_id=session_id)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.delete("/api/session/{session_id}")
+    async def clear_session(session_id: str):
+        try:
+            rag_system.session_manager.clear_session(session_id)
+            return {"success": True}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/courses", response_model=CourseStats)
+    async def get_course_stats():
+        try:
+            analytics = rag_system.get_course_analytics()
+            return CourseStats(
+                total_courses=analytics["total_courses"],
+                course_titles=analytics["course_titles"],
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+
+    return app
+
+
+@pytest.fixture
+def mock_rag_system():
+    rag_system = Mock()
+    rag_system.session_manager = Mock()
+    rag_system.session_manager.create_session.return_value = "test-session-id"
+    rag_system.query.return_value = (
+        "Test answer",
+        [{"text": "Intro to Testing - Lesson 1", "link": "https://example.com/intro-to-testing/lesson-1"}],
+    )
+    rag_system.get_course_analytics.return_value = {
+        "total_courses": 2,
+        "course_titles": ["Intro to Testing", "Advanced Fixtures"],
+    }
+    return rag_system
+
+
+@pytest.fixture
+def test_app(mock_rag_system, tmp_path):
+    static_dir = tmp_path / "frontend"
+    static_dir.mkdir()
+    (static_dir / "index.html").write_text("<html><body>Test Frontend</body></html>")
+    return create_test_app(mock_rag_system, static_dir)
+
+
+@pytest.fixture
+def client(test_app):
+    return TestClient(test_app)
