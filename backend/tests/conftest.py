@@ -222,12 +222,12 @@ from pydantic import BaseModel
 
 class QueryRequest(BaseModel):
     query: str
-    session_id: Optional[str] = None
+    session_id: str | None = None
 
 
 class SourceItem(BaseModel):
     text: str
-    link: Optional[str] = None
+    link: str | None = None
 
 
 class QueryResponse(BaseModel):
