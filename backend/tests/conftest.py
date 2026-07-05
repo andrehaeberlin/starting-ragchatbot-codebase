@@ -3,11 +3,11 @@
 backend/*.py modules use bare imports (e.g. `from vector_store import VectorStore`)
 rather than package-relative ones, so `backend/` itself must be on sys.path.
 """
+
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
-from typing import Optional
 
 import pytest
 
@@ -15,14 +15,14 @@ BACKEND_DIR = str(Path(__file__).resolve().parent.parent)
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
-from models import Course, Lesson, CourseChunk
-from vector_store import VectorStore, SearchResults
+from models import Course, CourseChunk, Lesson
 from search_tools import CourseSearchTool, ToolManager
-
+from vector_store import SearchResults, VectorStore
 
 # ---------------------------------------------------------------------------
 # Sample course data
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def sample_courses():
@@ -32,7 +32,11 @@ def sample_courses():
             course_link="https://example.com/intro-to-testing",
             instructor="Ada Lovelace",
             lessons=[
-                Lesson(lesson_number=1, title="Why Test?", lesson_link="https://example.com/intro-to-testing/lesson-1"),
+                Lesson(
+                    lesson_number=1,
+                    title="Why Test?",
+                    lesson_link="https://example.com/intro-to-testing/lesson-1",
+                ),
                 # Deliberately missing lesson_link to exercise the None-link path.
                 Lesson(lesson_number=2, title="Writing Assertions", lesson_link=None),
             ],
@@ -42,7 +46,11 @@ def sample_courses():
             course_link="https://example.com/advanced-fixtures",
             instructor="Grace Hopper",
             lessons=[
-                Lesson(lesson_number=1, title="Fixture Scopes", lesson_link="https://example.com/advanced-fixtures/lesson-1"),
+                Lesson(
+                    lesson_number=1,
+                    title="Fixture Scopes",
+                    lesson_link="https://example.com/advanced-fixtures/lesson-1",
+                ),
             ],
         ),
     ]
@@ -76,23 +84,33 @@ def sample_chunks():
 # Fake (pure unit) vector store
 # ---------------------------------------------------------------------------
 
+
 class FakeVectorStore:
     """Hand-rolled stand-in for VectorStore exposing only what CourseSearchTool touches."""
 
     def __init__(self):
-        self.search_return: Optional[SearchResults] = None
+        self.search_return: SearchResults | None = None
         self.lesson_links: dict = {}
         self.course_links: dict = {}
         self.last_search_kwargs = None
 
-    def search(self, query: str, course_name: Optional[str] = None, lesson_number: Optional[int] = None) -> SearchResults:
-        self.last_search_kwargs = {"query": query, "course_name": course_name, "lesson_number": lesson_number}
+    def search(
+        self,
+        query: str,
+        course_name: str | None = None,
+        lesson_number: int | None = None,
+    ) -> SearchResults:
+        self.last_search_kwargs = {
+            "query": query,
+            "course_name": course_name,
+            "lesson_number": lesson_number,
+        }
         return self.search_return
 
-    def get_lesson_link(self, course_title: str, lesson_number: int) -> Optional[str]:
+    def get_lesson_link(self, course_title: str, lesson_number: int) -> str | None:
         return self.lesson_links.get((course_title, lesson_number))
 
-    def get_course_link(self, course_title: str) -> Optional[str]:
+    def get_course_link(self, course_title: str) -> str | None:
         return self.course_links.get(course_title)
 
 
@@ -116,6 +134,7 @@ def tool_manager_fake(course_search_tool_fake):
 # ---------------------------------------------------------------------------
 # Real (integration) vector store backed by a temp ChromaDB instance
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def real_vector_store(tmp_path, sample_courses, sample_chunks):
@@ -143,6 +162,7 @@ def tool_manager_real(course_search_tool_real):
 # and raises AttributeError on typos, unlike MagicMock's auto-vivification).
 # ---------------------------------------------------------------------------
 
+
 def make_tool_call(id: str, name: str, arguments_json_str: str):
     return SimpleNamespace(
         id=id,
@@ -156,7 +176,9 @@ def make_message(content=None, tool_calls=None):
 
 
 def make_completion(finish_reason: str, message):
-    return SimpleNamespace(choices=[SimpleNamespace(finish_reason=finish_reason, message=message)])
+    return SimpleNamespace(
+        choices=[SimpleNamespace(finish_reason=finish_reason, message=message)]
+    )
 
 
 @pytest.fixture
@@ -172,7 +194,9 @@ def openai_builders():
 def mock_openai_client():
     """A fake OpenAI client exposing only client.chat.completions.create(...)."""
     create = Mock()
-    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create))
+    )
     return client
 
 

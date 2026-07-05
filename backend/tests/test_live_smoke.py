@@ -4,6 +4,7 @@ chroma_db, to distinguish a code bug from an environment/API-key issue.
 Never runs by default (see pyproject.toml's `addopts = "-m 'not live'"`).
 Run manually with: uv run pytest backend/tests -m live -s
 """
+
 import sys
 import traceback
 from pathlib import Path
@@ -32,12 +33,16 @@ def test_live_content_question_does_not_crash():
     rag_system = RAGSystem(config)
 
     if rag_system.vector_store.get_course_count() == 0:
-        pytest.skip("No courses ingested in backend/chroma_db - run the app once to ingest ../docs first")
+        pytest.skip(
+            "No courses ingested in backend/chroma_db - run the app once to ingest ../docs first"
+        )
 
     try:
         answer, sources = rag_system.query("What is covered in lesson 1?")
     except Exception as e:
-        pytest.fail(f"rag_system.query() raised {type(e).__name__}: {e}\n\n{traceback.format_exc()}")
+        pytest.fail(
+            f"rag_system.query() raised {type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+        )
 
     assert isinstance(answer, str) and answer.strip()
     print(f"\nLive answer: {answer}\nSources: {sources}")
