@@ -16,8 +16,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "black>=26.5.1",
     "pytest>=9.1.1",
     "httpx>=0.27",
+    "ruff>=0.15.20",
 ]
 
 [tool.pytest.ini_options]
@@ -26,3 +28,23 @@ markers = [
     "live: hits the real OpenAI API, run manually only (uv run pytest -m live -s)",
 ]
 addopts = "-m 'not live'"
+
+[tool.black]
+line-length = 88
+target-version = ["py313"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+src = ["backend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["backend"]
+
+[tool.ruff.lint.per-file-ignores]
+"backend/tests/conftest.py" = ["E402"]
+"backend/tests/test_live_smoke.py" = ["E402"]

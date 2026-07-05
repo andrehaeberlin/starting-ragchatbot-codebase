@@ -1,6 +1,8 @@
 import json
+from typing import Any
+
 from openai import OpenAI
-from typing import List, Optional, Dict, Any, Tuple
+
 
 class AIGenerator:
     """Handles interactions with OpenAI's Chat Completions API for generating responses"""
@@ -35,22 +37,23 @@ All responses must be:
 Provide only the direct answer to what was asked.
 """
 
-    def __init__(self, api_key: str, model: str, max_tool_rounds: int = MAX_TOOL_ROUNDS):
+    def __init__(
+        self, api_key: str, model: str, max_tool_rounds: int = MAX_TOOL_ROUNDS
+    ):
         self.client = OpenAI(api_key=api_key)
         self.model = model
         self.max_tool_rounds = max_tool_rounds
 
         # Pre-build base API parameters
-        self.base_params = {
-            "model": self.model,
-            "temperature": 0,
-            "max_tokens": 800
-        }
+        self.base_params = {"model": self.model, "temperature": 0, "max_tokens": 800}
 
-    def generate_response(self, query: str,
-                         conversation_history: Optional[str] = None,
-                         tools: Optional[List] = None,
-                         tool_manager=None) -> str:
+    def generate_response(
+        self,
+        query: str,
+        conversation_history: str | None = None,
+        tools: list | None = None,
+        tool_manager=None,
+    ) -> str:
         """
         Generate AI response, allowing up to `max_tool_rounds` sequential rounds
         of tool calling. Each round is a separate API request so the model can
@@ -76,7 +79,7 @@ Provide only the direct answer to what was asked.
 
         messages = [
             {"role": "system", "content": system_content},
-            {"role": "user", "content": query}
+            {"role": "user", "content": query},
         ]
 
         round_num = 0
@@ -95,8 +98,8 @@ Provide only the direct answer to what was asked.
 
             response = self.client.chat.completions.create(**api_params)
             message = response.choices[0].message
-            has_tool_calls = (
-                response.choices[0].finish_reason == "tool_calls" and bool(message.tool_calls)
+            has_tool_calls = response.choices[0].finish_reason == "tool_calls" and bool(
+                message.tool_calls
             )
 
             # Termination (b): no tool calls requested - this is the final answer
@@ -114,11 +117,13 @@ Provide only the direct answer to what was asked.
                 tool_result, failed = self._execute_tool_call(tool_call, tool_manager)
                 hard_failure = hard_failure or failed
 
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "content": tool_result
-                })
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": tool_result,
+                    }
+                )
 
             # Termination (a) or (c): rounds exhausted or a tool call hard-failed -
             # fall through to a final, tools-omitted call to synthesize an answer
@@ -130,7 +135,7 @@ Provide only the direct answer to what was asked.
         return final_response.choices[0].message.content
 
     @staticmethod
-    def _to_openai_tools(tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _to_openai_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Convert Anthropic-style tool definitions to OpenAI's function-calling format"""
         return [
             {
@@ -138,14 +143,14 @@ Provide only the direct answer to what was asked.
                 "function": {
                     "name": tool["name"],
                     "description": tool["description"],
-                    "parameters": tool["input_schema"]
-                }
+                    "parameters": tool["input_schema"],
+                },
             }
             for tool in tools
         ]
 
     @staticmethod
-    def _build_assistant_tool_call_message(message) -> Dict[str, Any]:
+    def _build_assistant_tool_call_message(message) -> dict[str, Any]:
         """Build the assistant message that echoes back the model's tool_calls,
         required before any role:"tool" result messages can be sent."""
         return {
@@ -157,15 +162,15 @@ Provide only the direct answer to what was asked.
                     "type": "function",
                     "function": {
                         "name": tool_call.function.name,
-                        "arguments": tool_call.function.arguments
-                    }
+                        "arguments": tool_call.function.arguments,
+                    },
                 }
                 for tool_call in message.tool_calls
-            ]
+            ],
         }
 
     @staticmethod
-    def _execute_tool_call(tool_call, tool_manager) -> Tuple[str, bool]:
+    def _execute_tool_call(tool_call, tool_manager) -> tuple[str, bool]:
         """
         Execute a single tool call, returning (result_content, hard_failure).
 
@@ -180,7 +185,10 @@ Provide only the direct answer to what was asked.
             return f"Tool execution error: {e}", False
 
         try:
-            return tool_manager.execute_tool(tool_call.function.name, **arguments), False
+            return (
+                tool_manager.execute_tool(tool_call.function.name, **arguments),
+                False,
+            )
         except TypeError as e:
             return f"Tool execution error: {e}", False
         except Exception as e:
